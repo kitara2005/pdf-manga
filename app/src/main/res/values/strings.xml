@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Reading PDF</string>
+    <string name="open_pdf">Mở PDF</string>
+    <string name="page">Trang %1$d / %2$d</string>
+    <string name="no_pdf_opened">Chưa mở tệp PDF</string>
+    <string name="go_to_page">Tới trang…</string>
+    <string name="render_quality">Chất lượng render</string>
+    <string name="bitmap_limit">Giới hạn kích thước bitmap</string>
+    <string name="quality_1">1.0x (nhanh)</string>
+    <string name="quality_1_5">1.5x (cân bằng)</string>
+    <string name="quality_2">2.0x (sắc nét)</string>
+    <string name="limit_2000">Giới hạn 2000 px</string>
+    <string name="limit_3000">Giới hạn 3000 px</string>
+    <string name="limit_4096">Giới hạn 4096 px</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Hủy</string>
+    <string name="forget_last">Quên tài liệu gần nhất</string>
+    <string name="reset_settings">Reset cấu hình</string>
+    <string name="confirm_reset_title">Reset cấu hình?</string>
+    <string name="confirm_reset_message">Khôi phục chất lượng và giới hạn mặc định, đồng thời xóa trạng thái zoom đã lưu cho tài liệu hiện tại. Tiếp tục?</string>
+    <string name="yes">Có</string>
+    <string name="no">Không</string>
+    <string name="done">Đã xong</string>
+</resources>
+

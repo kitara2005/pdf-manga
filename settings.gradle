@@ -1,0 +1,4 @@
+rootProject.name = "reading-pdf"
+include ':app'
+
+

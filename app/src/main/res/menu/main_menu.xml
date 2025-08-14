@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_go_to_page"
+        android:title="@string/go_to_page"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_quality"
+        android:title="@string/render_quality"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_max_bitmap"
+        android:title="@string/bitmap_limit"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_forget_last"
+        android:title="@string/forget_last"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_reset_settings"
+        android:title="@string/reset_settings"
+        app:showAsAction="never" />
+</menu>
+
