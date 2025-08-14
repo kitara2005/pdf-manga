@@ -195,3 +195,44 @@ adb install -r app\\build\\outputs\\apk\\debug\\app-debug.apk
 - AAB Release: `app/build/outputs/bundle/release/app-release.aab`
 
 
+---
+
+## Cấu hình kết nối Google Drive (danh sách và folder)
+
+Ứng dụng hỗ trợ 2 cách nạp danh sách PDF để đọc tuần tự:
+- Từ một file văn bản (mỗi dòng là 1 URL PDF) đặt trên Drive hoặc bất kỳ URL công khai
+- Từ một folder Google Drive (liệt kê toàn bộ file PDF bên trong, có phân trang)
+
+### 1) Chuẩn bị trên Google Cloud (cho chế độ duyệt folder)
+1. Mở Google Cloud Console → tạo Project mới (hoặc chọn project có sẵn)
+2. Trong “APIs & Services” → “Library” → bật “Google Drive API” cho project
+3. Vào “APIs & Services” → “Credentials” → “Create credentials” → chọn “API key”
+4. Sao chép API key vừa tạo
+   - Khuyến nghị: “Restrict key” để giới hạn chỉ dùng với Google Drive API
+
+### 2) Chia sẻ quyền thư mục/tệp trên Drive
+- Với folder: bấm Share → đặt “Anyone with the link” ở quyền Viewer (xem)
+- Với file danh sách (text) hoặc file PDF: cũng cần quyền “Anyone with the link - Viewer” để ứng dụng tải được
+
+### 3) Thiết lập trực tiếp trong ứng dụng
+- Mở ứng dụng → menu (ba chấm trên thanh trên cùng):
+  - “Thiết lập Drive API key”: dán API key vừa tạo ở bước (1)
+  - “Thiết lập link folder Drive”: dán link dạng `https://drive.google.com/drive/folders/<FOLDER_ID>`
+  - “Tải danh sách từ folder Drive”: ứng dụng sẽ gọi Drive API để liệt kê các file PDF công khai trong folder và lưu thành danh sách đọc
+  - “Mở truyện kế tiếp”: tải về và mở lần lượt từng PDF từ danh sách đã lưu
+
+### 4) Thiết lập danh sách bằng file văn bản (tuỳ chọn, không cần API key)
+- Tạo 1 file `.txt` trên Drive, mỗi dòng chứa 1 URL PDF (có thể là link Drive dạng file hoặc URL trực tiếp)
+- Chia sẻ file ở chế độ công khai như trên
+- Trong ứng dụng:
+  - “Thiết lập link danh sách”: dán link file `.txt` công khai (hoặc URL bất kỳ trả về text)
+  - “Tải danh sách”: đọc nội dung text và lưu thành danh sách URL PDF
+  - “Mở truyện kế tiếp”: tải và mở PDF theo thứ tự
+
+### 5) Ghi chú
+- Ứng dụng chỉ liệt kê/tải được nội dung công khai; nếu folder/file riêng tư, hãy cấp quyền hoặc chuyển sang “Anyone with the link – Viewer”
+- Duyệt folder sử dụng Google Drive API v3; lưu ý hạn ngạch (quota) và rate limit của API key
+- Trình phân tích JSON trong mã được tối giản; nếu bạn muốn độ tin cậy cao hơn, có thể thay bằng thư viện JSON như Gson/Moshi
+- Link Drive dạng file được chuyển thành URL tải trực tiếp: `https://drive.google.com/uc?export=download&id=<FILE_ID>`
+
+
