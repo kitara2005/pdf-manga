@@ -12,6 +12,8 @@ object Prefs {
     private const val KEY_DRIVE_LINK = "drive_link"
     private const val KEY_LIST = "doc_list"
     private const val KEY_LIST_INDEX = "doc_list_index"
+    private const val KEY_DRIVE_API_KEY = "drive_api_key"
+    private const val KEY_DRIVE_FOLDER_LINK = "drive_folder_link"
 
     fun getQuality(context: Context, default: Float = 1.5f): Float {
         val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -75,6 +77,26 @@ object Prefs {
     fun setListIndex(context: Context, idx: Int) {
         val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         sp.edit().putInt(KEY_LIST_INDEX, idx).apply()
+    }
+
+    fun setDriveApiKey(context: Context, key: String?) {
+        val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        sp.edit().putString(KEY_DRIVE_API_KEY, key).apply()
+    }
+
+    fun getDriveApiKey(context: Context): String? {
+        val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        return sp.getString(KEY_DRIVE_API_KEY, null)
+    }
+
+    fun setDriveFolderLink(context: Context, link: String?) {
+        val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        sp.edit().putString(KEY_DRIVE_FOLDER_LINK, link).apply()
+    }
+
+    fun getDriveFolderLink(context: Context): String? {
+        val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        return sp.getString(KEY_DRIVE_FOLDER_LINK, null)
     }
 
     private fun zoomKey(doc: String, pageIndex: Int): String = "$PREFIX_ZOOM${doc}:${pageIndex}"

@@ -90,6 +90,18 @@ class MainActivity : AppCompatActivity() {
                     openNextFromList()
                     true
                 }
+                R.id.action_set_drive_api_key -> {
+                    promptSetDriveApiKey()
+                    true
+                }
+                R.id.action_set_drive_folder_link -> {
+                    promptSetDriveFolderLink()
+                    true
+                }
+                R.id.action_browse_drive_folder -> {
+                    browseDriveFolder()
+                    true
+                }
                 else -> false
             }
         }
@@ -379,6 +391,118 @@ class MainActivity : AppCompatActivity() {
             val id = m.groupValues[1]
             "https://drive.google.com/uc?export=download&id=${'$'}id"
         } else l
+    }
+
+    private fun promptSetDriveApiKey() {
+        val editText = com.google.android.material.textfield.TextInputEditText(this).apply {
+            setText(Prefs.getDriveApiKey(this@MainActivity) ?: "")
+            hint = getString(R.string.drive_api_key)
+        }
+        val layout = com.google.android.material.textfield.TextInputLayout(this).apply {
+            setPadding(24, 8, 24, 0)
+            addView(editText)
+        }
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.set_drive_api_key)
+            .setView(layout)
+            .setPositiveButton(R.string.ok) { d, _ ->
+                Prefs.setDriveApiKey(this, editText.text?.toString()?.trim())
+                d.dismiss()
+            }
+            .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
+            .show()
+    }
+
+    private fun promptSetDriveFolderLink() {
+        val editText = com.google.android.material.textfield.TextInputEditText(this).apply {
+            setText(Prefs.getDriveFolderLink(this@MainActivity) ?: "")
+            hint = getString(R.string.set_drive_folder_link)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val layout = com.google.android.material.textfield.TextInputLayout(this).apply {
+            setPadding(24, 8, 24, 0)
+            addView(editText)
+        }
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.set_drive_folder_link)
+            .setView(layout)
+            .setPositiveButton(R.string.ok) { d, _ ->
+                Prefs.setDriveFolderLink(this, editText.text?.toString()?.trim())
+                d.dismiss()
+            }
+            .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
+            .show()
+    }
+
+    private fun browseDriveFolder() {
+        val apiKey = Prefs.getDriveApiKey(this)
+        if (apiKey.isNullOrBlank()) {
+            com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.no_api_key, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            return
+        }
+        val link = Prefs.getDriveFolderLink(this)
+        if (link.isNullOrBlank()) {
+            com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.invalid_folder_id, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            return
+        }
+        val folderId = extractDriveFolderId(link) ?: run {
+            com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.invalid_folder_id, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            return
+        }
+        com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.downloading, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+        scope.launch {
+            val list = withContext(Dispatchers.IO) { fetchDriveFolderFiles(folderId, apiKey) }
+            if (list.isEmpty()) {
+                com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.list_empty, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            } else {
+                Prefs.setList(this@MainActivity, list)
+                Prefs.setListIndex(this@MainActivity, 0)
+                com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.done, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun extractDriveFolderId(link: String): String? {
+        val patterns = listOf(
+            Regex("https?://drive\\.google\\.com/drive/folders/([a-zA-Z0-9_-]+)"),
+            Regex("https?://drive\\.google\\.com/drive/u/\\d/folders/([a-zA-Z0-9_-]+)")
+        )
+        for (r in patterns) {
+            val m = r.find(link)
+            if (m != null && m.groupValues.size > 1) return m.groupValues[1]
+        }
+        return null
+    }
+
+    private fun fetchDriveFolderFiles(folderId: String, apiKey: String): List<String> {
+        val result = mutableListOf<String>()
+        var pageToken: String? = null
+        do {
+            val url = buildString {
+                append("https://www.googleapis.com/drive/v3/files?q=")
+                val query = "'${'$'}folderId' in parents and mimeType='application/pdf' and trashed=false"
+                append(java.net.URLEncoder.encode(query, "UTF-8"))
+                append("&fields=files(id,name,mimeType),nextPageToken&key=${'$'}apiKey")
+                if (pageToken != null) append("&pageToken=${'$'}pageToken")
+            }
+            val json = downloadText(url)
+            if (json.isNullOrBlank()) break
+            val files = parseDriveFiles(json)
+            result.addAll(files)
+            pageToken = parseNextPageToken(json)
+        } while (!pageToken.isNullOrBlank())
+        return result
+    }
+
+    private fun parseDriveFiles(json: String): List<String> {
+        // very light parsing without full JSON lib: look for "id": "..."
+        val ids = Regex("\"id\"\s*:\s*\"([a-zA-Z0-9_-]+)\"").findAll(json).map { it.groupValues[1] }.toList()
+        return ids.map { id -> "https://drive.google.com/uc?export=download&id=${'$'}id" }
+    }
+
+    private fun parseNextPageToken(json: String): String? {
+        val m = Regex("\"nextPageToken\"\s*:\s*\"([^"]+)\"").find(json)
+        return m?.groupValues?.getOrNull(1)
     }
 }
 
