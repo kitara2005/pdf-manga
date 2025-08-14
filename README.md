@@ -235,4 +235,56 @@ adb install -r app\\build\\outputs\\apk\\debug\\app-debug.apk
 - Trình phân tích JSON trong mã được tối giản; nếu bạn muốn độ tin cậy cao hơn, có thể thay bằng thư viện JSON như Gson/Moshi
 - Link Drive dạng file được chuyển thành URL tải trực tiếp: `https://drive.google.com/uc?export=download&id=<FILE_ID>`
 
+---
+
+## Cấu hình OAuth (Google Sign‑In) để duyệt folder Drive (không cần API key)
+
+Ứng dụng hỗ trợ đăng nhập Google và gọi Drive API bằng access token người dùng (scope chỉ đọc). Bạn cần cấu hình OAuth trên Google Cloud và cung cấp SHA‑1 cho Android Client.
+
+### 1) Bật OAuth consent screen và Drive API
+- Vào Google Cloud Console → chọn Project
+- “APIs & Services” → “OAuth consent screen”:
+  - Chọn User Type (External cho thử nghiệm), điền thông tin bắt buộc
+  - Thêm scope: `.../auth/drive.readonly`
+  - Click “Publish app” (nếu là External) hoặc thêm tester vào danh sách
+- “APIs & Services” → “Library” → bật “Google Drive API”
+
+### 2) Tạo OAuth Client ID cho Android
+- “APIs & Services” → “Credentials” → “Create credentials” → “OAuth client ID” → “Android”
+- Package name: `com.example.readingpdf`
+- SHA‑1:
+  - Debug (Android Studio): View → Tool Windows → Gradle → <project> → Tasks → android → `signingReport`
+    - Hoặc lệnh:
+      ```bash
+      keytool -list -v \
+        -alias androiddebugkey \
+        -keystore "$HOME/.android/debug.keystore" \
+        -storepass android -keypass android
+      ```
+  - Release: dùng keystore phát hành của bạn
+    ```bash
+    keytool -list -v -alias <RELEASE_ALIAS> -keystore <PATH_TO_RELEASE_KEYSTORE>
+    ```
+- Tạo xong, lưu Client ID/Client name để tham khảo
+
+### 3) (Tuỳ chọn) Tạo OAuth Client ID loại “Web application”
+- Nếu muốn yêu cầu `idToken/serverAuthCode` (phục vụ các luồng nâng cao), tạo thêm Client ID loại Web và lấy `Client ID`
+- Thêm vào `app/src/main/res/values/strings.xml` khóa sau nếu cần:
+  ```xml
+  <string name="default_web_client_id">YOUR_WEB_CLIENT_ID.apps.googleusercontent.com</string>
+  ```
+
+### 4) Cấu hình trong ứng dụng
+- Mở app → Menu:
+  - “Đăng nhập Google”: đăng nhập và cấp quyền Drive Readonly
+  - “Thiết lập link folder Drive”: dán link dạng `https://drive.google.com/drive/folders/<FOLDER_ID>`
+  - “Tải danh sách từ folder Drive”: lấy access token (Bearer) và gọi Drive API để liệt kê file PDF trong folder
+  - “Mở truyện kế tiếp”: tải PDF và mở theo thứ tự
+
+### 5) Ghi chú bảo mật và hạn chế
+- Access token là ngắn hạn; app sẽ xin lại khi cần
+- Chỉ yêu cầu scope Drive Readonly; bạn có thể thu hẹp thêm nếu cần
+- Ở chế độ External và chưa publish, chỉ tester được chỉ định mới đăng nhập được
+- Khi phát hành, thay `packageName`/SHA‑1 theo bản release của bạn
+
 
