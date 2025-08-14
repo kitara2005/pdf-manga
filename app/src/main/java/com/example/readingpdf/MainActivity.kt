@@ -10,6 +10,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager2.widget.ViewPager2
 import com.example.readingpdf.databinding.ActivityMainBinding
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.Scope
+import com.google.android.gms.tasks.Tasks
+import com.google.api.services.drive.DriveScopes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,6 +37,7 @@ class MainActivity : AppCompatActivity() {
     private var maxBitmapDim: Int = 3000
     private var currentDocumentId: String? = null
     private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private var googleClient: GoogleSignInClient? = null
 
     private val openDocument = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -90,16 +98,20 @@ class MainActivity : AppCompatActivity() {
                     openNextFromList()
                     true
                 }
-                R.id.action_set_drive_api_key -> {
-                    promptSetDriveApiKey()
-                    true
-                }
                 R.id.action_set_drive_folder_link -> {
                     promptSetDriveFolderLink()
                     true
                 }
                 R.id.action_browse_drive_folder -> {
                     browseDriveFolder()
+                    true
+                }
+                R.id.action_sign_in -> {
+                    signInGoogle()
+                    true
+                }
+                R.id.action_sign_out -> {
+                    signOutGoogle()
                     true
                 }
                 else -> false
@@ -137,6 +149,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             Prefs.getLastDocumentUri(this)?.let { openPdfFromUri(it) }
         }
+
+        setupGoogleSignIn()
     }
 
     private fun confirmResetSettings() {
@@ -393,25 +407,7 @@ class MainActivity : AppCompatActivity() {
         } else l
     }
 
-    private fun promptSetDriveApiKey() {
-        val editText = com.google.android.material.textfield.TextInputEditText(this).apply {
-            setText(Prefs.getDriveApiKey(this@MainActivity) ?: "")
-            hint = getString(R.string.drive_api_key)
-        }
-        val layout = com.google.android.material.textfield.TextInputLayout(this).apply {
-            setPadding(24, 8, 24, 0)
-            addView(editText)
-        }
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.set_drive_api_key)
-            .setView(layout)
-            .setPositiveButton(R.string.ok) { d, _ ->
-                Prefs.setDriveApiKey(this, editText.text?.toString()?.trim())
-                d.dismiss()
-            }
-            .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
-            .show()
-    }
+    // API key flow removed
 
     private fun promptSetDriveFolderLink() {
         val editText = com.google.android.material.textfield.TextInputEditText(this).apply {
@@ -435,9 +431,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun browseDriveFolder() {
-        val apiKey = Prefs.getDriveApiKey(this)
-        if (apiKey.isNullOrBlank()) {
-            com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.no_api_key, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+        val useOAuth = Prefs.isOAuthEnabled(this)
+        if (!useOAuth) {
+            com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.sign_in, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
             return
         }
         val link = Prefs.getDriveFolderLink(this)
@@ -451,7 +447,7 @@ class MainActivity : AppCompatActivity() {
         }
         com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.downloading, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
         scope.launch {
-            val list = withContext(Dispatchers.IO) { fetchDriveFolderFiles(folderId, apiKey) }
+            val list = withContext(Dispatchers.IO) { fetchDriveFolderFilesWithOAuth(folderId) }
             if (list.isEmpty()) {
                 com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.list_empty, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
             } else {
@@ -503,6 +499,75 @@ class MainActivity : AppCompatActivity() {
     private fun parseNextPageToken(json: String): String? {
         val m = Regex("\"nextPageToken\"\s*:\s*\"([^"]+)\"").find(json)
         return m?.groupValues?.getOrNull(1)
+    }
+
+    private fun setupGoogleSignIn() {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestScopes(Scope(DriveScopes.DRIVE_READONLY))
+            .requestIdToken(getString(R.string.default_web_client_id))
+            .requestServerAuthCode(getString(R.string.default_web_client_id), false)
+            .build()
+        googleClient = GoogleSignIn.getClient(this, gso)
+    }
+
+    private fun signInGoogle() {
+        val client = googleClient ?: return
+        startActivityForResult(client.signInIntent, 1001)
+    }
+
+    private fun signOutGoogle() {
+        googleClient?.signOut()
+        Prefs.setOAuthEnabled(this, false)
+        com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.done, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 1001) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+            try {
+                val account = task.result
+                if (account != null) {
+                    Prefs.setOAuthEnabled(this, true)
+                    com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.using_oauth, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun fetchDriveFolderFilesWithOAuth(folderId: String): List<String> {
+        val account: GoogleSignInAccount = GoogleSignIn.getLastSignedInAccount(this) ?: return emptyList()
+        val tokenResult = Tasks.await(com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(null))
+        val accessToken = com.google.android.gms.auth.GoogleAuthUtil.getToken(
+            this,
+            account.account, // Account
+            "oauth2:${'$'}{DriveScopes.DRIVE_READONLY}"
+        )
+
+        val result = mutableListOf<String>()
+        var pageToken: String? = null
+        do {
+            val url = buildString {
+                append("https://www.googleapis.com/drive/v3/files?q=")
+                val query = "'${'$'}folderId' in parents and mimeType='application/pdf' and trashed=false"
+                append(java.net.URLEncoder.encode(query, "UTF-8"))
+                append("&fields=files(id,name,mimeType),nextPageToken")
+                if (pageToken != null) append("&pageToken=${'$'}pageToken")
+            }
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.setRequestProperty("Authorization", "Bearer ${'$'}accessToken")
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            val json = try {
+                conn.inputStream.bufferedReader().use { it.readText() }
+            } catch (_: Exception) { null } finally { conn.disconnect() }
+            if (json.isNullOrBlank()) break
+            val files = parseDriveFiles(json)
+            result.addAll(files)
+            pageToken = parseNextPageToken(json)
+        } while (!pageToken.isNullOrBlank())
+        return result
     }
 }
 

@@ -28,11 +28,13 @@
     <string name="open_next">Mở truyện kế tiếp</string>
     <string name="list_empty">Danh sách rỗng</string>
     <string name="downloading">Đang tải…</string>
-    <string name="set_drive_api_key">Thiết lập Drive API key</string>
-    <string name="drive_api_key">Drive API key</string>
+    
     <string name="set_drive_folder_link">Thiết lập link folder Drive</string>
     <string name="browse_drive_folder">Tải danh sách từ folder Drive</string>
     <string name="invalid_folder_id">Link folder không hợp lệ</string>
-    <string name="no_api_key">Chưa có API key</string>
+    
+    <string name="sign_in">Đăng nhập Google</string>
+    <string name="sign_out">Đăng xuất</string>
+    <string name="using_oauth">Đang dùng OAuth</string>
 </resources>
 
