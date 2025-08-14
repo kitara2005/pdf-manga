@@ -9,6 +9,9 @@ object Prefs {
     private const val KEY_MAX_DIM = "max_bitmap_dim"
     private const val KEY_LAST_DOC = "last_doc_uri"
     private const val PREFIX_ZOOM = "zoom:"
+    private const val KEY_DRIVE_LINK = "drive_link"
+    private const val KEY_LIST = "doc_list"
+    private const val KEY_LIST_INDEX = "doc_list_index"
 
     fun getQuality(context: Context, default: Float = 1.5f): Float {
         val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -40,6 +43,38 @@ object Prefs {
         val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         val s = sp.getString(KEY_LAST_DOC, null) ?: return null
         return try { Uri.parse(s) } catch (_: Throwable) { null }
+    }
+
+    fun setDriveLink(context: Context, link: String?) {
+        val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        sp.edit().putString(KEY_DRIVE_LINK, link).apply()
+    }
+
+    fun getDriveLink(context: Context): String? {
+        val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        return sp.getString(KEY_DRIVE_LINK, null)
+    }
+
+    fun setList(context: Context, list: List<String>) {
+        val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        sp.edit().putString(KEY_LIST, list.joinToString("\n")).apply()
+        sp.edit().putInt(KEY_LIST_INDEX, 0).apply()
+    }
+
+    fun getList(context: Context): List<String> {
+        val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        val s = sp.getString(KEY_LIST, null) ?: return emptyList()
+        return s.lines().map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    fun getListIndex(context: Context): Int {
+        val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        return sp.getInt(KEY_LIST_INDEX, 0)
+    }
+
+    fun setListIndex(context: Context, idx: Int) {
+        val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        sp.edit().putInt(KEY_LIST_INDEX, idx).apply()
     }
 
     private fun zoomKey(doc: String, pageIndex: Int): String = "$PREFIX_ZOOM${doc}:${pageIndex}"

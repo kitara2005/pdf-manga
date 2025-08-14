@@ -21,5 +21,17 @@
         android:id="@+id/action_reset_settings"
         android:title="@string/reset_settings"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/action_set_drive_link"
+        android:title="@string/set_drive_link"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_fetch_list"
+        android:title="@string/fetch_list"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_open_next"
+        android:title="@string/open_next"
+        app:showAsAction="never" />
 </menu>
 

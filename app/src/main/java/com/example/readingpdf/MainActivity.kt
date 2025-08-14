@@ -10,8 +10,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager2.widget.ViewPager2
 import com.example.readingpdf.databinding.ActivityMainBinding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
@@ -21,6 +28,8 @@ class MainActivity : AppCompatActivity() {
     private var pageAdapter: PdfPageAdapter? = null
     private var qualityMultiplier: Float = 1.5f
     private var maxBitmapDim: Int = 3000
+    private var currentDocumentId: String? = null
+    private val scope = CoroutineScope(Dispatchers.Main + Job())
 
     private val openDocument = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -67,6 +76,18 @@ class MainActivity : AppCompatActivity() {
                 }
                 R.id.action_reset_settings -> {
                     confirmResetSettings()
+                    true
+                }
+                R.id.action_set_drive_link -> {
+                    promptSetDriveLink()
+                    true
+                }
+                R.id.action_fetch_list -> {
+                    fetchListFromDrive()
+                    true
+                }
+                R.id.action_open_next -> {
+                    openNextFromList()
                     true
                 }
                 else -> false
@@ -252,6 +273,112 @@ class MainActivity : AppCompatActivity() {
         pageAdapter?.close()
         pdfRenderer?.close()
         fileDescriptor?.close()
+    }
+
+    private fun promptSetDriveLink() {
+        val editText = com.google.android.material.textfield.TextInputEditText(this).apply {
+            setText(Prefs.getDriveLink(this@MainActivity) ?: "")
+            hint = getString(R.string.drive_link)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val layout = com.google.android.material.textfield.TextInputLayout(this).apply {
+            setPadding(24, 8, 24, 0)
+            addView(editText)
+        }
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.set_drive_link)
+            .setView(layout)
+            .setPositiveButton(R.string.ok) { d, _ ->
+                Prefs.setDriveLink(this, editText.text?.toString()?.trim())
+                d.dismiss()
+            }
+            .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
+            .show()
+    }
+
+    private fun fetchListFromDrive() {
+        val link = Prefs.getDriveLink(this)
+        if (link.isNullOrBlank()) {
+            com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.drive_link, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            return
+        }
+        com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.downloading, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+        scope.launch {
+            val text = withContext(Dispatchers.IO) { downloadText(link) }
+            if (text.isNullOrBlank()) {
+                com.google.android.material.snackbar.Snackbar.make(binding.root, "Download failed", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            } else {
+                val items = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                Prefs.setList(this@MainActivity, items)
+                com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.done, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun openNextFromList() {
+        val list = Prefs.getList(this)
+        if (list.isEmpty()) {
+            com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.list_empty, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            return
+        }
+        val idx = Prefs.getListIndex(this)
+        val next = list.getOrNull(idx) ?: run {
+            com.google.android.material.snackbar.Snackbar.make(binding.root, R.string.list_empty, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            return
+        }
+        scope.launch {
+            val file = withContext(Dispatchers.IO) { downloadFile(next) }
+            if (file != null) {
+                openPdfFromUri(android.net.Uri.fromFile(file))
+                Prefs.setListIndex(this@MainActivity, (idx + 1).coerceAtMost(list.size))
+            } else {
+                com.google.android.material.snackbar.Snackbar.make(binding.root, "Download failed", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun downloadText(url: String): String? {
+        val normalized = maybeConvertGoogleDriveLink(url)
+        val conn = URL(normalized).openConnection() as HttpURLConnection
+        conn.connectTimeout = 15000
+        conn.readTimeout = 30000
+        return try {
+            conn.inputStream.bufferedReader().use { it.readText() }
+        } catch (_: Exception) {
+            null
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun downloadFile(url: String): File? {
+        val normalized = maybeConvertGoogleDriveLink(url)
+        val conn = URL(normalized).openConnection() as HttpURLConnection
+        conn.connectTimeout = 15000
+        conn.readTimeout = 60000
+        return try {
+            val outFile = File(cacheDir, "dl_${'$'}{System.currentTimeMillis()}.pdf")
+            conn.inputStream.use { input ->
+                FileOutputStream(outFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            outFile
+        } catch (_: Exception) {
+            null
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun maybeConvertGoogleDriveLink(link: String): String {
+        val l = link.trim()
+        val regex = Regex("https?://drive\\.google\\.com/file/d/([a-zA-Z0-9_-]+)/?")
+        val m = regex.find(l)
+        return if (m != null && m.groupValues.size > 1) {
+            val id = m.groupValues[1]
+            "https://drive.google.com/uc?export=download&id=${'$'}id"
+        } else l
     }
 }
 

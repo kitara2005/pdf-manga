@@ -22,5 +22,11 @@
     <string name="yes">Có</string>
     <string name="no">Không</string>
     <string name="done">Đã xong</string>
+    <string name="drive_link">Link Google Drive hoặc URL</string>
+    <string name="set_drive_link">Thiết lập link danh sách</string>
+    <string name="fetch_list">Tải danh sách</string>
+    <string name="open_next">Mở truyện kế tiếp</string>
+    <string name="list_empty">Danh sách rỗng</string>
+    <string name="downloading">Đang tải…</string>
 </resources>
 
